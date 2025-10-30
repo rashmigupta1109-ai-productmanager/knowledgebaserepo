@@ -45,6 +45,19 @@
       padding: 10px 14px;
       border-radius: 12px;
       max-width: 80%;
+      position: relative;
+    }
+
+    .message-content {
+      margin-bottom: 4px;
+    }
+
+    .message-time {
+      font-size: 11px;
+      opacity: 0.7;
+      position: absolute;
+      bottom: 4px;
+      right: 8px;
     }
 
     .user {
@@ -52,6 +65,7 @@
       color: white;
       align-self: flex-end;
       border-bottom-right-radius: 0;
+      padding-bottom: 20px;
     }
 
     .bot {
@@ -59,6 +73,7 @@
       color: #111;
       align-self: flex-start;
       border-bottom-left-radius: 0;
+      padding-bottom: 20px;
     }
 
     .chat-input {
@@ -89,6 +104,24 @@
     button:hover {
       background: #005fa3;
     }
+    .quick-test {
+      background: #28a745;
+      margin-left: 8px;
+    }
+    .quick-test:hover {
+      background: #218838;
+    }
+    .clear-btn {
+      background: #dc3545;
+      margin-left: 8px;
+    }
+    .clear-btn:hover {
+      background: #c82333;
+    }
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -97,16 +130,55 @@
     <div class="chat-box" id="chat-box"></div>
     <div class="chat-input">
       <input type="text" id="user-input" placeholder="Ask a question..." />
-      <button onclick="sendMessage()">Send</button>
+      <button id="send-btn" onclick="sendMessage()">Send</button>
+      <button id="test-btn" onclick="quickTest()" class="quick-test">Quick Test</button>
+      <button id="clear-btn" onclick="clearAll()" class="clear-btn">Clear All</button>
     </div>
   </div>
 
   <script>
+    // Utility functions for UI state management
+    function setUIState(disabled = false) {
+      document.getElementById("user-input").disabled = disabled;
+      document.getElementById("send-btn").disabled = disabled;
+      document.getElementById("test-btn").disabled = disabled;
+      document.getElementById("clear-btn").disabled = disabled;
+    }
+
+    function formatTimestamp(date) {
+      return date.toLocaleTimeString(undefined, { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    let messageId = 1;
+    function createMessage(text, sender, timestamp = new Date()) {
+      const msgDiv = document.createElement("div");
+      msgDiv.classList.add("message", sender);
+      msgDiv.dataset.messageId = messageId++;
+      
+      const contentDiv = document.createElement("div");
+      contentDiv.className = "message-content";
+      contentDiv.textContent = text;
+      
+      const timeDiv = document.createElement("div");
+      timeDiv.className = "message-time";
+      timeDiv.textContent = formatTimestamp(timestamp);
+      
+      msgDiv.appendChild(contentDiv);
+      msgDiv.appendChild(timeDiv);
+      return msgDiv;
+    }
+
     async function sendMessage() {
       const inputField = document.getElementById("user-input");
       const chatBox = document.getElementById("chat-box");
       const message = inputField.value.trim();
       if (!message) return;
+      
+      setUIState(true); // Disable UI during API call
 
       // Display user message
       const userMsg = document.createElement("div");
@@ -137,6 +209,48 @@
       }
 
       chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function quickTest() {
+      const chatBox = document.getElementById("chat-box");
+      const testQuestion = "What is our PTO policy?";
+      
+      setUIState(true); // Disable UI during test
+      
+      // Display user message
+      const userMsg = createMessage(testQuestion, "user");
+      chatBox.appendChild(userMsg);
+
+      // Show thinking message
+      const responseMsg = createMessage("Testing API connection...", "bot");
+      chatBox.appendChild(responseMsg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch("http://localhost:5000/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: "policy" })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        responseMsg.querySelector('.message-content').textContent = 
+          `API Response: ${data.answer || "No answer received"}`;
+      } catch (err) {
+        responseMsg.querySelector('.message-content').textContent = 
+          `API Error: ${err.message}. Is the Flask server running on port 5000?`;
+      }
+
+      chatBox.scrollTop = chatBox.scrollHeight;
+      setUIState(false); // Re-enable UI
+    }
+
+    function clearAll() {
+      if (!confirm('Are you sure you want to clear all messages?')) return;
+      const chatBox = document.getElementById("chat-box");
+      chatBox.innerHTML = '';
+      messageId = 1; // Reset message counter
     }
   </script>
 </body>
