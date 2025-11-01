@@ -177,7 +177,7 @@
       const chatBox = document.getElementById("chat-box");
       const message = inputField.value.trim();
       if (!message) return;
-      
+
       setUIState(true); // Disable UI during API call
 
       // Display user message
@@ -188,7 +188,7 @@
 
       inputField.value = "";
 
-      // Send to backend
+      // Show bot thinking message
       const responseMsg = document.createElement("div");
       responseMsg.classList.add("message", "bot");
       responseMsg.textContent = "Thinking...";
@@ -196,19 +196,39 @@
       chatBox.scrollTop = chatBox.scrollHeight;
 
       try {
-        const res = await fetch("http://localhost:5000/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: message })
-        });
-
-        const data = await res.json();
-        responseMsg.textContent = data.answer || "Sorry, I couldn’t find an answer.";
+        let data;
+        if (message.toLowerCase().startsWith("search confluence:")) {
+          // Extract query after the prefix
+          const query = message.substring("search confluence:".length).trim();
+          const res = await fetch("http://localhost:3000/confluence-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query })
+          });
+          data = await res.json();
+          if (data.results && data.results.length > 0) {
+            responseMsg.innerHTML = `<b>Confluence Results:</b><br>` + data.results.map(r =>
+              `<div style='margin-bottom:8px;'><a href='${r.url}' target='_blank'><b>${r.title}</b></a><br><span style='font-size:0.95em;color:#555;'>${r.excerpt}</span></div>`
+            ).join("");
+          } else {
+            responseMsg.textContent = "No results found in Confluence.";
+          }
+        } else {
+          // Default: use /ask endpoint
+          const res = await fetch("http://localhost:5000/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question: message })
+          });
+          data = await res.json();
+          responseMsg.textContent = data.answer || "Sorry, I couldn’t find an answer.";
+        }
       } catch (err) {
         responseMsg.textContent = "Error: Unable to connect to server.";
       }
 
       chatBox.scrollTop = chatBox.scrollHeight;
+      setUIState(false);
     }
 
     async function quickTest() {
